@@ -1,13 +1,22 @@
 from typing import List
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, TextGenerationPipeline
+import torch, simplejson
 
 address = '0.0.0.0'
 port = 50055
-current = "EleutherAI/gpt-neo-125M"
+current = "josu/gpt-neo-1.3B-instruction"
 
 model = AutoModelForCausalLM.from_pretrained(current)
 tokenizer = AutoTokenizer.from_pretrained(current)
+    
+def pretty_floats(obj):
+    if isinstance(obj, float):
+        return f'{obj:.4f}'
+    elif isinstance(obj, dict):
+        return dict((k, pretty_floats(v)) for k, v in obj.items())
+    elif isinstance(obj, (list, tuple)):
+        return list(map(pretty_floats, obj))
+    return obj
 
 class GPTNeoWrap:
     model: AutoModelForCausalLM
@@ -27,36 +36,39 @@ class GPTNeoWrap:
         return [raw(self.tokenizer.convert_tokens_to_string([token])) for token in self.tokenizer.convert_ids_to_tokens(tokens)]
     
 
-    def forward(self, text: str) -> torch.tensor:
+    def forward(self, text: str) -> str:
         token_ids = self.tokenizer.encode(text)
-        token_strs = self.displayable_tokens(token_ids)
         tokens = self.tokenizer(text, return_tensors="pt")
         tokens.to(self.model.device)
         output = self.model.transformer(**tokens, output_hidden_states=True)
-        embedding = output.hidden_states[0].shape
-        context = output.hidden_states[-1].shape
+        embedding = output.hidden_states[0].detach()[0]
+        context = output.last_hidden_state.detach()[0]
+        embedding = torch.fft.fft(embedding, dim=1).real.numpy()
+        context = torch.fft.fft(context, dim=1).real.numpy()
+        embedding = embedding[:, :20]
+        context = context[:, :20]
 
-        logits = self.model.lm_head(output.hidden_states[-1])[-1,-1,:]
+
+        logits = self.model.lm_head(output.last_hidden_state)
+        logits = torch.softmax(logits[0,-1,:], dim=-1)
         logits = torch.topk(logits, k=5, dim=-1)
         top_k_generated_token_id = logits.indices
-        print(top_k_generated_token_id)
         top_k_generated_token = self.displayable_tokens(top_k_generated_token_id)
         top_k_generated_token_logits = logits.values
 
-        return {
-            "tokens": token_strs,
+        return simplejson.dumps({
+            "tokens": self.displayable_tokens(token_ids),
             "token_ids": token_ids,
-            "embedding": embedding,
-            "context": context,
+            "embedding": pretty_floats(embedding.round(decimals=4).tolist()),
+            "context": pretty_floats(context.round(decimals=4).tolist()),
             "logits": {
                 "top_k": top_k_generated_token,
-                "top_k_ids": top_k_generated_token_id,
-                "top_k_logits": top_k_generated_token_logits,
+                "top_k_ids": top_k_generated_token_id.tolist(),
+                "top_k_logits": pretty_floats(top_k_generated_token_logits.round(decimals=4).tolist()),
             }
-        }
+        })
 
     
 wrap = GPTNeoWrap(model=model, tokenizer=tokenizer)
-output = wrap.forward("the quick brown fox")
-
+output = wrap.forward("the quick brown fox,")
 print(output)
