@@ -1,13 +1,6 @@
 from typing import List
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextGenerationPipeline
 import torch, simplejson
-
-address = '0.0.0.0'
-port = 50055
-current = "josu/gpt-neo-1.3B-instruction"
-
-model = AutoModelForCausalLM.from_pretrained(current)
-tokenizer = AutoTokenizer.from_pretrained(current)
     
 def pretty_floats(obj):
     if isinstance(obj, float):
@@ -67,8 +60,3 @@ class GPTNeoWrap:
                 "top_k_logits": pretty_floats(top_k_generated_token_logits.round(decimals=4).tolist()),
             }
         })
-
-    
-wrap = GPTNeoWrap(model=model, tokenizer=tokenizer)
-output = wrap.forward("the quick brown fox,")
-print(output)
