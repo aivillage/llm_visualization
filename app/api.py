@@ -8,8 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
 current = "josu/gpt-neo-1.3B-instruction"
+
 model = AutoModelForCausalLM.from_pretrained(current)
 tokenizer = AutoTokenizer.from_pretrained(current)
+
 wrap = GPTNeoWrap(model=model, tokenizer=tokenizer)
 
 class RequestBody(BaseModel):
@@ -27,3 +29,7 @@ app.add_middleware(
 async def root(req: RequestBody):
     print(req.userInput)
     return wrap.forward(req.userInput)
+
+@app.get("/test")
+async def root():
+    return {"message": "Hello World"}
