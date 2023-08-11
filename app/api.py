@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-current = "josu/gpt-neo-1.3B-instruction"
+current = "EleutherAI/gpt-neo-1.3B"
 
 model = AutoModelForCausalLM.from_pretrained(current)
 tokenizer = AutoTokenizer.from_pretrained(current)
