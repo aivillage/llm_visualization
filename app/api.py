@@ -1,21 +1,12 @@
 from fastapi import FastAPI
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from GPTNeoWrap import GPTNeoWrap
+from GPTNeoWrap import router as api_router
 from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
-
-current = "EleutherAI/gpt-neo-1.3B"
-
-model = AutoModelForCausalLM.from_pretrained(current)
-tokenizer = AutoTokenizer.from_pretrained(current)
-
-wrap = GPTNeoWrap(model=model, tokenizer=tokenizer)
-
-class RequestBody(BaseModel):
-    userInput: str
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,11 +16,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/", response_class=ORJSONResponse)
-async def root(req: RequestBody):
-    print(req.userInput)
-    return wrap.forward(req.userInput)
 
-@app.get("/test")
-async def root():
-    return {"message": "Hello World"}
+def make_app():
+    app = FastAPI(
+        docs_url=None, # Disable docs (Swagger UI)
+        redoc_url=None, # Disable redoc    
+    )
+    app.mount("/", StaticFiles(directory="app/static"), name="static")
+    app.include_router(api_router, prefix="/api")
+
+    

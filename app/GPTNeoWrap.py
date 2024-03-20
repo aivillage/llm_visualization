@@ -1,6 +1,9 @@
 from typing import List
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextGenerationPipeline
 import torch, simplejson
+from pydantic import BaseModel
+from fastapi import APIRouter, Request
+from fastapi.responses import ORJSONResponse
     
 def pretty_floats(obj):
     if isinstance(obj, float):
@@ -60,3 +63,23 @@ class GPTNeoWrap:
                 "top_k_logits": pretty_floats(top_k_generated_token_logits.round(decimals=4).tolist()),
             }
         })
+    
+router = APIRouter()
+
+current = "EleutherAI/gpt-neo-1.3B"
+
+model = AutoModelForCausalLM.from_pretrained(current)
+tokenizer = AutoTokenizer.from_pretrained(current)
+wrap = GPTNeoWrap(model=model, tokenizer=tokenizer)
+
+class RequestBody(BaseModel):
+    userInput: str
+
+@router.post("/", response_class=ORJSONResponse)
+async def root(req: RequestBody):
+    print(req.userInput)
+    return wrap.forward(req.userInput)
+
+@router.get("/test")
+async def root():
+    return {"message": "Hello World"}
